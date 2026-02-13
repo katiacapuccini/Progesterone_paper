@@ -1,0 +1,1188 @@
+---
+title: "Steroid targeted assay analyses"
+output: html_document
+date: "2022-10-23"
+---
+
+### Load libraries
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+library(here)
+library(ggplot2)
+library(janitor)
+library(tidyverse)
+library(ggpubr)
+library(gridExtra)
+library(patchwork)
+library(dplyr)
+
+#set theme for plots in this markdown
+theme_set(theme_minimal())
+```
+
+```{r setup, include=FALSE}
+#set preference for markdown chunks
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+### Load data and merge with metadata
+Load metadata file ("metadata.csv") containing patients info including Subject ID, gestational age at sampling, outcome info, ethnicity, BMI etc. 
+Load steroids levels files ("hormones_values_final.csv") containing final values calculated with adjustment for sample weight. A detailed explanation of the calculations done is in the file named "hormones_calculations.csv".
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+#Load metadata
+metadata<- read.csv(here("metadata.csv"))
+metadata<- clean_names(metadata)
+
+#Load steroids values
+hormones<- read.csv((here("hormones_values_final.csv")))
+hormones<- clean_names(hormones)
+
+#Merge by sample_id
+data <- merge(metadata, hormones, by="sample_id")
+
+#Recode Miscarriage (n=1) as preterm
+data<- data %>% mutate (preterm_v_term_1 = case_when(preterm_v_term == "Preterm" ~ "Preterm",
+                                                     preterm_v_term == "Miscarriage" ~ "Preterm",
+                                                     preterm_v_term == "Term" ~ "Term")) %>%
+                                           relocate(preterm_v_term_1, .after = preterm_v_term)
+
+```
+
+### Basic summary of statistics - all samples included
+Summary of basic statistics for progesterone, cortisol and androstenedione levels in all samples. Results saved in "summary_levels_P_C_A.csv". 
+```{r}
+
+#Summary statistics progesterone
+summary_P<- data %>%
+  summarise(
+    count = n(),
+    min = min(data$progesterone_ng_g, na.rm = TRUE),
+    median = median(data$progesterone_ng_g, na.rm = TRUE),
+    max = max(data$progesterone_ng_g, na.rm = TRUE),
+    sd = sd(data$progesterone_ng_g, na.rm = TRUE),
+    IQR = IQR(data$progesterone_ng_g, na.rm = TRUE))
+
+#Summary statistics cortisol
+summary_C<- data %>%
+  summarise(
+    count = n(),
+    min = min(data$cortisol_ng_g, na.rm = TRUE),
+    median = median(data$cortisol_ng_g, na.rm = TRUE),
+    max = max(data$cortisol_ng_g, na.rm = TRUE),
+    sd = sd(data$cortisol_ng_g, na.rm = TRUE),
+    IQR = IQR(data$cortisol_ng_g, na.rm = TRUE))
+
+#Summary statistics androstenedione
+summary_A<- data %>%
+  summarise(
+    count = n(),
+    min = min(data$androstenedione_ng_g, na.rm = TRUE),
+    median = median(data$androstenedione_ng_g, na.rm = TRUE),
+    max = max(data$androstenedione_ng_g, na.rm = TRUE),
+    sd = sd(data$androstenedione_ng_g, na.rm = TRUE),
+    IQR = IQR(data$androstenedione_ng_g, na.rm = TRUE))
+
+#save results in csv file
+#write.csv(rbind(summary_P, summary_C, summary_A), here("images", "summary_levels_P_C_A.csv"))
+summary_P
+summary_C
+summary_A
+```
+
+### Box plots - all samples including
+Box plots showing levels of the steroids in all samples available. Image with 3 plots side by side also shown.
+```{r}
+
+#box plot of progesterone levels 
+P <- ggplot(data, aes(x = 1, y = data$progesterone_ng_g)) +
+     geom_boxplot(fill = "#4682b4") +
+     geom_jitter(width = 0.2, height = 0, color = "black", alpha = 0.5) +
+     scale_x_continuous(breaks = NULL) +
+     xlab("Progesterone") + ylab("ng/g") +
+     theme(legend.position = "none", text = element_text(size=20)) + 
+     ylim(0, 20)
+#ggsave(here("images", "progesterone_levels.png"), P, width = 3, height = 8)
+
+#box plot of cortisol levels 
+C <- ggplot(data, aes(x = 1, y = data$cortisol_ng_g)) +
+     geom_boxplot(fill = "#4682b4") +
+     geom_jitter(width = 0.2, height = 0, color = "black", alpha = 0.5) +
+     scale_x_continuous(breaks = NULL) +
+     xlab("Cortisol") + ylab("ng/g") +
+     theme(legend.position = "none", text = element_text(size=20)) +
+     ylim(0, 20)
+#ggsave(here("images", "cortisol_levels.png"), C, width = 3, height = 8)
+
+#box plot of androstenedione levels 
+A <- ggplot(data, aes(x = 1, y = data$androstenedione_ng_g)) +
+     geom_boxplot(fill = "#4682b4") +
+     geom_jitter(width = 0.2, height = 0, color = "black", alpha = 0.5) +
+     scale_x_continuous(breaks = NULL) +
+     xlab("Androstenedione") + ylab("ng/g") +
+     theme(legend.position = "none", text = element_text(size=20)) + 
+      ylim(0, 20)
+#ggsave(here("images", "androstenedione_levels.png"), A, width = 3, height = 8)
+
+
+#image with 3 plots together
+P_C_A_plot<-P + C+ A & ylab(NULL)
+P_C_A_plot<-wrap_elements(P_C_A_plot) +
+  labs(tag = "ng/g") +
+  theme(plot.tag = element_text(size = 20, angle = 90),
+  plot.tag.position = "left")
+
+#ggsave(here("images", "prog_cort_and_levels.png"), P_C_A_plot, width = 8, height = 8)
+P_C_A_plot
+```
+
+### Basic summary of statistics - only low-risk samples
+Summary of basic statistics for progesterone, cortisol and androstenedione levels in low risk samples.This is done to have levels of main steroids in healthy pregnancies. Results saved in "summary_levels_P_C_A_controls.csv". 
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+
+#filter out high risk pregnancy and term pregnancy
+data_low_risk<- data %>% filter(data$risk_group == "control" & data$preterm_v_term_1 == "Term")
+
+
+summary_P<- data_low_risk %>%
+  summarise(
+    count = n(),
+    min = min(data_low_risk$progesterone_ng_g, na.rm = TRUE),
+    median = median(data_low_risk$progesterone_ng_g, na.rm = TRUE),
+    max = max(data_low_risk$progesterone_ng_g, na.rm = TRUE),
+    sd = sd(data_low_risk$progesterone_ng_g, na.rm = TRUE),
+    IQR = IQR(data_low_risk$progesterone_ng_g, na.rm = TRUE))
+
+summary_C<- data_low_risk %>%
+  summarise(
+    count = n(),
+    min = min(data_low_risk$cortisol_ng_g, na.rm = TRUE),
+    median = median(data_low_risk$cortisol_ng_g, na.rm = TRUE),
+    max = max(data_low_risk$cortisol_ng_g, na.rm = TRUE),
+    sd = sd(data_low_risk$cortisol_ng_g, na.rm = TRUE),
+    IQR = IQR(data_low_risk$cortisol_ng_g, na.rm = TRUE))
+
+summary_A<- data_low_risk %>%
+  summarise(
+    count = n(),
+    min = min(data_low_risk$androstenedione_ng_g, na.rm = TRUE),
+    median = median(data_low_risk$androstenedione_ng_g, na.rm = TRUE),
+    max = max(data_low_risk$androstenedione_ng_g, na.rm = TRUE),
+    sd = sd(data_low_risk$androstenedione_ng_g, na.rm = TRUE),
+    IQR = IQR(data_low_risk$androstenedione_ng_g, na.rm = TRUE))
+
+#write.csv(rbind(summary_P, summary_C, summary_A), here("images","summary_levels_P_C_A_controls.csv"))
+
+summary_P
+summary_C
+summary_A
+```
+
+### Box plots - low risk samples
+Box plots showing levels of the steroids low risk samples. Image with 3 plots side by side also shown.
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+#box plot of progesterone levels 
+P <- ggplot(data_low_risk, aes(x = 1, y = data_low_risk$progesterone_ng_g)) +
+     geom_boxplot(fill = "#4682b4") +
+     geom_jitter(width = 0.2, height = 0, color = "black", alpha = 0.5) +
+     scale_x_continuous(breaks = NULL) +
+     xlab("Progesterone") + ylab("ng/g") +
+     theme(legend.position = "none", text = element_text(size=20)) +
+     ylim(0, 25)
+#ggsave(here("images", "progesterone_levels_LowRisk.png"), P, width = 3, height = 8)
+
+#box plot of cortisol levels 
+C <- ggplot(data_low_risk, aes(x = 1, y = data_low_risk$cortisol_ng_g)) +
+     geom_boxplot(fill = "#4682b4") +
+     geom_jitter(width = 0.2, height = 0, color = "black", alpha = 0.5) +
+     scale_x_continuous(breaks = NULL) +
+     xlab("Cortisol") + ylab("ng/g") +
+     theme(legend.position = "none", text = element_text(size=20)) +
+     ylim(0, 25)
+#(here("images", "cortisol_levels_LowRisk.png"), C, width = 3, height = 8)
+
+#box plot of androstenedione levels 
+A <- ggplot(data_low_risk, aes(x = 1, y = data_low_risk$androstenedione_ng_g)) +
+     geom_boxplot(fill = "#4682b4") +
+     geom_jitter(width = 0.2, height = 0, color = "black", alpha = 0.5) +
+     scale_x_continuous(breaks = NULL) +
+     xlab("Androstenedione") + ylab("ng/g") +
+     theme(legend.position = "none", text = element_text(size=20)) +
+     ylim(0, 25)
+#ggsave(here("images", "androstenedione_levels_LowRisk.png"), A, width = 3, height = 8)
+
+
+#image with 3 plots together
+P_C_A_plot<-P + C+ A & ylab(NULL)
+P_C_A_plot<-wrap_elements(P_C_A_plot) +
+  labs(tag = "ng/g") +
+  theme(plot.tag = element_text(size = 20, angle = 90),
+  plot.tag.position = "left")
+
+#ggsave(here("images", "prog_cort_and_levels_LowRisk.png"), P_C_A_plot, width = 8, height = 8)
+P_C_A_plot
+```
+
+***
+
+## Analysis of steroids relationship with gestational age
+### Progesterone
+Linear model progesterone ~ gestational age
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+#linear model prog vs gest age
+model<- lm(data$progesterone_ng_g ~ gestational_age_final , data= data)
+s<- summary(model)
+
+R2 <- round(s$r.squared, 3)
+Fstat <- round(s$fstatistic[1], 3)
+df1 <- s$fstatistic[2]
+df2 <- s$fstatistic[3]
+pval <- signif(pf(s$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+
+# Create label
+label_text <- paste0("R² = ", R2,
+                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+                     "\np = ", pval)
+
+#create dataframe with prediction and fake gestational age (I added some manually so I could do cbind with the values)
+fake_gest_age <- data.frame(gestational_age_final = c(seq(12.5, 25.5, by = 0.005)))
+prediction<- predict(model, newdata=fake_gest_age)
+predicted_frame<-cbind(fake_gest_age, prediction)
+
+#plot coloured according to risk factor annotated with stats
+prog_scatterplot <- ggplot(data, aes(x = gestational_age_final, y = progesterone_ng_g)) +
+  geom_point(aes(colour = risk_group), size = 4) +
+  geom_line(data = predicted_frame, aes(x = gestational_age_final, y = prediction)) +
+  annotate("text", 
+           x = 13, y = max(data$progesterone_ng_g, na.rm = TRUE)*0.95, 
+           label = label_text, hjust = 0, size = 5) +
+  labs(colour = "Outcome") +
+  xlab("Gestational Age (weeks)") +
+  ylab("Progesterone (ng/g)") +
+  theme(text = element_text(size = 15)) +
+  scale_colour_manual(values = c("control" = "#00BFC4", "high" = "#F8766D"),  labels = c("control" = "Uncomplicated", "high" = "Adverse"))
+
+#ggsave(here("images_reviewed", "prog_scatterplot_coloured.png"), prog_scatterplot, width = 8, height = 8)
+prog_scatterplot
+```
+
+### Cortisol
+Linear model cortisol ~ gestational age
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+#linear model prog vs gest age
+model_cort<- lm(cortisol_ng_g ~ gestational_age_final , data= data)
+sc<- summary(model_cort)
+
+R2 <- round(sc$r.squared, 3)
+Fstat <- round(sc$fstatistic[1], 3)
+df1 <- sc$fstatistic[2]
+df2 <- sc$fstatistic[3]
+pval <- signif(pf(sc$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+
+# Create label
+label_text <- paste0("R² = ", R2,
+                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+                     "\np = ", pval)
+
+
+#create dataframe with prediction and fake gestational age (I added some manually so I could do cbind with the values)
+fake_gest_age <- data.frame(gestational_age_final = c(seq(12.5, 25.5, by = 0.005)))
+prediction<- predict(model_cort, newdata=fake_gest_age)
+predicted_frame<-cbind(fake_gest_age, prediction)
+
+#plot coloured according to risk factor annotated with stats
+cort_scatterplot <- ggplot(data, aes(x = gestational_age_final, y = cortisol_ng_g)) +
+  geom_point(aes(colour = risk_group), size = 4) +
+  geom_line(data = predicted_frame, aes(x = gestational_age_final, y = prediction)) +
+  annotate("text", 
+           x = 13, y = max(data$cortisol_ng_g, na.rm = TRUE)*0.95, 
+           label = label_text, hjust = 0, size = 5) +
+  labs(colour = "Outcome") +
+  xlab("Gestational Age (weeks)") +
+  ylab("Cortisol (ng/g)") +
+  theme(text = element_text(size = 15)) +
+  scale_colour_manual(values = c("control" = "#00BFC4", "high" = "#F8766D"), labels = c("control" = "Uncomplicated", "high" = "Adverse"))
+
+#ggsave(here("images_reviewed", "cort_scatterplot_coloured.png"), cort_scatterplot, width = 8, height = 8)
+cort_scatterplot
+```
+
+### Androstenedione
+Linear model androstenedione ~ gestational age
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+#linear model prog vs gest age
+model_and<- lm(androstenedione_ng_g ~ gestational_age_final , data= data)
+sa<- summary(model_and)
+
+R2 <- round(sa$r.squared, 3)
+Fstat <- round(sa$fstatistic[1], 3)
+df1 <- sa$fstatistic[2]
+df2 <- sa$fstatistic[3]
+pval <- signif(pf(sa$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+
+# Create label
+label_text <- paste0("R² = ", R2,
+                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+                     "\np = ", pval)
+
+
+#create dataframe with prediction and fake gestational age (I added some manually so I could do cbind with the values)
+fake_gest_age <- data.frame(gestational_age_final = c(seq(12.5, 25.5, by = 0.005)))
+prediction<- predict(model_and, newdata=fake_gest_age)
+predicted_frame<-cbind(fake_gest_age, prediction)
+
+#plot coloured according to risk factor
+androst_scatterplot<- ggplot(data, aes(x = gestational_age_final, y = androstenedione_ng_g)) +
+  geom_point(aes(colour = risk_group), size = 4) +
+  geom_line(data = predicted_frame, aes(x = gestational_age_final, y = prediction)) +
+  annotate("text", 
+           x = 13, y = max(data$androstenedione_ng_g, na.rm = TRUE)*0.95, 
+           label = label_text, hjust = 0, size = 5) +
+  labs(colour = "Outcome") +
+  xlab("Gestational Age (weeks)") +
+  ylab("Androstenedione (ng/g)") +
+  theme(text = element_text(size = 15)) +
+  scale_colour_manual(values = c("control" = "#00BFC4", "high" = "#F8766D"), labels = c("control" = "Uncomplicated", "high" = "Adverse"))
+
+
+
+#ggsave(here("images_reviewed", "androst_scatterplot_coloured.png"), androst_scatterplot, width = 8, height = 8)
+androst_scatterplot
+```
+
+
+
+
+
+### Figure with the 3 scatterplots
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+scatterplots<- prog_scatterplot+ cort_scatterplot+ androst_scatterplot + plot_layout(guides = 'collect')
+ggsave(here("images_reviewed", "scatterplots_P_C_A.png"), scatterplots, width = 18, height = 6)
+```
+
+
+***
+
+## Relationship with gestational age in longitudinal samples
+Investigate what happens to hormones levels for individuals were we have longitudinal samples (n=5)
+
+```{r}
+#filter only longitudinal data
+data_paired<- data %>% filter(data$longitudinal =="yes")
+```
+
+### Progesterone
+```{r}
+#progesterone individuals levels
+individuals_prog<- data_paired %>%
+  ggplot(aes(gestational_age_final,progesterone_ng_g, color=timepoint)) +
+  geom_point(aes(fill=timepoint),size=5) +
+  geom_line(aes(group = cons_v2),color="grey")+ xlab("Gestational Age") + ylab("Progesterone ng/g") + theme(text = element_text(size = 20), axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size = 10))+ facet_grid(. ~ cons_v2) + scale_colour_manual(values = c("A" = "#a5e35d", "B" = "#388E3C"))
+#ggsave(here("images_reviewed", "individuals_prog_coloured.png"), individuals_prog, width = 8, height = 8)
+
+#statistical summary
+group_by(data_paired, timepoint) %>%
+  summarise(
+    count = n(),
+    median = median(progesterone_ng_g, na.rm = TRUE),
+    IQR = IQR(progesterone_ng_g, na.rm = TRUE))
+
+#box plot
+prog_timepoint_A_B<- ggplot(data_paired, aes(x = data_paired$timepoint, y = as.numeric(data_paired$progesterone_ng_g)))+ geom_boxplot(aes(fill=data_paired$timepoint), alpha = 0.8, outlier.shape = NA)+ xlab("Timepoint")+ylab("Progesterone")+theme(legend.position = "none")+ theme(text = element_text(size = 30))  + scale_fill_manual(values = c("A" = "#a5e35d", "B" = "#388E3C"))+ ylim(0, 20)
+#ggsave(here("images_reviewed", "prog_timepoint_A_B_coloured.png"), prog_timepoint_A_B, width = 8, height = 8)
+
+#t-test
+numeric_timepoint <- ifelse( data_paired$timepoint == "A", 1, 2)
+result <- t.test(data_paired$progesterone_ng_g, numeric_timepoint, paired = TRUE)
+result$p.value
+
+individuals_prog
+prog_timepoint_A_B
+``` 
+
+### Cortisol
+```{r}
+#Cortisol individual levels
+individuals_cort<- data_paired %>%
+  ggplot(aes(gestational_age_final,cortisol_ng_g, color=timepoint)) +
+  geom_point(aes(fill=timepoint),size=5) +
+  geom_line(aes(group = cons_v2),color="grey")+ xlab("Gestational Age") + ylab("Cortisol ng/g") + theme(text = element_text(size = 20), axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size = 10))+ facet_grid(. ~ cons_v2)  + scale_colour_manual(values = c("A" = "#a5e35d", "B" = "#388E3C"))
+#ggsave(here("images_reviewed", "individuals_cort_coloured.png"), individuals_cort, width = 8, height = 8)
+
+#statistical summary
+group_by(data_paired, timepoint) %>%
+  summarise(
+    count = n(),
+    median = median(cortisol_ng_g, na.rm = TRUE),
+    IQR = IQR(cortisol_ng_g, na.rm = TRUE))
+
+#box plot
+cort_timepoint_A_B<- ggplot(data_paired, aes(x = data_paired$timepoint, y = as.numeric(data_paired$cortisol_ng_g)))+ geom_boxplot(aes(fill=data_paired$timepoint), alpha = 0.8, outlier.shape = NA)+ xlab("Timepoint")+ylab("Cortisol")+theme(legend.position = "none")+ theme(text = element_text(size = 30)) + scale_fill_manual(values = c("A" = "#a5e35d", "B" = "#388E3C"))
+#ggsave(here("images_reviewed", "cort_timepoint_A_B_coloured.png"), cort_timepoint_A_B, width = 8, height = 8)
+
+#t-test
+numeric_timepoint <- ifelse( data_paired$timepoint == "A", 1, 2)
+result <- t.test(data_paired$cortisol_ng_g, numeric_timepoint, paired = TRUE)
+result$p.value
+
+individuals_cort
+cort_timepoint_A_B
+``` 
+
+### Androstenedione
+```{r}
+#Cortisol individual levels
+individuals_andr<- data_paired %>%
+  ggplot(aes(gestational_age_final,androstenedione_ng_g, color=timepoint)) +
+  geom_point(aes(fill=timepoint),size=5) +
+  geom_line(aes(group = cons_v2),color="grey")+ xlab("Gestational Age") + ylab("Androstenedione ng/g") + theme(text = element_text(size = 20), axis.text.x = element_text(angle = 45, vjust = 1, hjust=1, size = 10))+ facet_grid(. ~ cons_v2)  + scale_colour_manual(values = c("A" = "#a5e35d", "B" = "#388E3C"))
+#ggsave(here("images_reviewed", "individuals_andr_coloured.png"), individuals_andr, width = 8, height = 8)
+
+#statistical summary
+group_by(data_paired, timepoint) %>%
+  summarise(
+    count = n(),
+    median = median(androstenedione_ng_g, na.rm = TRUE),
+    IQR = IQR(androstenedione_ng_g, na.rm = TRUE))
+
+#box plot
+andr_timepoint_A_B<- ggplot(data_paired, aes(x = data_paired$timepoint, y = as.numeric(data_paired$androstenedione_ng_g)))+ geom_boxplot(aes(fill=data_paired$timepoint), alpha = 0.8, outlier.shape = NA)+ xlab("Timepoint")+ylab("Androstenedione")+theme(legend.position = "none")+ theme(text = element_text(size = 30)) + scale_fill_manual(values = c("A" = "#a5e35d", "B" = "#388E3C"))
+#ggsave(here("images_reviewed", "andr_timepoint_A_B_coloured.png"), andr_timepoint_A_B, width = 8, height = 8)
+
+#t-test
+numeric_timepoint <- ifelse(data_paired$timepoint == "A", 1, 2)
+result <- t.test(data_paired$androstenedione_ng_g, numeric_timepoint, paired = TRUE)
+result$p.value
+
+individuals_andr
+andr_timepoint_A_B
+``` 
+
+***
+
+***
+
+# Regression model of cervical lenght and steroids levels
+
+
+#Progesterone plot
+```{r}
+data$cl_visit <- as.numeric(as.character(data$cl_visit))
+
+# Remove missing value from miscarriage patient
+data_clean <- data[is.finite(data$cl_visit) & is.finite(data$progesterone_ng_g), ]
+
+# Fit linear model
+model_cl <- lm(progesterone_ng_g ~ cl_visit, data = data_clean)
+
+# Summary
+s <- summary(model_cl)
+
+# Extract stats
+R2 <- round(s$r.squared, 3)
+Fstat <- round(s$fstatistic[1], 3)
+df1 <- s$fstatistic[2]
+df2 <- s$fstatistic[3]
+pval <- signif(pf(s$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+
+label_text <- paste0("R² = ", R2,
+                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+                     "\np = ", pval)
+
+# Prediction frame
+fake_cl <- data.frame(cl_visit = seq(min(data_clean$cl_visit), 
+                                     max(data_clean$cl_visit), 
+                                     length.out = 100))
+prediction <- predict(model_cl, newdata = fake_cl)
+predicted_frame <- cbind(fake_cl, prediction)
+
+# Plot
+prog_cerv<- ggplot(data_clean, aes(x = cl_visit, y = progesterone_ng_g)) +
+  geom_point(aes(colour = risk_group), size = 4) +
+  geom_line(data = predicted_frame, aes(x = cl_visit, y = prediction)) +
+  annotate("text", 
+           x = min(data_clean$cl_visit) + 0.2,
+           y = max(data_clean$progesterone_ng_g)* 0.95, 
+           label = label_text, 
+           hjust = 0, size = 6) +
+  labs(colour = "Outcome") +
+  xlab("Cervical Length (mm)") +
+  ylab("Progesterone (ng/g)") +
+  theme(text = element_text(size = 15)) +
+  scale_colour_manual(values = c("control" = "#00BFC4", "high" = "#F8766D"), labels = c("control" = "Uncomplicated", "high" = "Adverse"))
+#ggsave(here("images_reviewed", "prog_cerv.png"), prog_cerv, width = 6, height = 6)
+```
+
+# Cortisol plot
+
+```{r}
+model_cort <- lm(cortisol_ng_g ~ cl_visit, data = data_clean)
+s <- summary(model_cort)
+
+R2 <- round(s$r.squared, 3)
+Fstat <- round(s$fstatistic[1], 3)
+df1 <- s$fstatistic[2]
+df2 <- s$fstatistic[3]
+pval <- signif(pf(s$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+
+label_text <- paste0("R² = ", R2,
+                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+                     "\np = ", pval)
+
+fake_cl <- data.frame(cl_visit = seq(min(data_clean$cl_visit), max(data_clean$cl_visit), length.out = 100))
+prediction <- predict(model_cort, newdata = fake_cl)
+predicted_frame <- cbind(fake_cl, prediction)
+
+cortisol_cerv<- ggplot(data_clean, aes(x = cl_visit, y = cortisol_ng_g)) +
+  geom_point(aes(colour = risk_group), size = 4) +
+  geom_line(data = predicted_frame, aes(x = cl_visit, y = prediction)) +
+  annotate("text", x = min(data_clean$cl_visit) + 0.2, y = max(data_clean$cortisol_ng_g)* 0.95, 
+           label = label_text, hjust = 0, size = 6) +
+  labs(colour = "Outcome") +
+  xlab("Cervical Length (mm)") +
+  ylab("Cortisol (ng/g)") +
+  theme(text = element_text(size = 15)) +
+  scale_colour_manual(values = c("control" = "#00BFC4", "high" = "#F8766D"), labels = c("control" = "Uncomplicated", "high" = "Adverse"))
+#ggsave(here("images_reviewed", "cortisol_cerv.png"), cortisol_cerv, width = 6, height = 6)
+
+```
+#Androstenedione
+
+```{r}
+model_and <- lm(androstenedione_ng_g ~ cl_visit, data = data_clean)
+s <- summary(model_and)
+
+R2 <- round(s$r.squared, 3)
+Fstat <- round(s$fstatistic[1], 3)
+df1 <- s$fstatistic[2]
+df2 <- s$fstatistic[3]
+pval <- signif(pf(s$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+
+label_text <- paste0("R² = ", R2,
+                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+                     "\np = ", pval)
+
+fake_cl <- data.frame(cl_visit = seq(min(data_clean$cl_visit), max(data_clean$cl_visit), length.out = 100))
+prediction <- predict(model_and, newdata = fake_cl)
+predicted_frame <- cbind(fake_cl, prediction)
+
+andr_cerv<- ggplot(data_clean, aes(x = cl_visit, y = androstenedione_ng_g)) +
+  geom_point(aes(colour = risk_group), size = 4) +
+  geom_line(data = predicted_frame, aes(x = cl_visit, y = prediction)) +
+  annotate("text", x = min(data_clean$cl_visit) + 0.2, y = max(data_clean$androstenedione_ng_g)* 0.95, 
+           label = label_text, hjust = 0, size = 6) +
+  labs(colour = "Outcome") +
+  xlab("Cervical Length (mm)") +
+  ylab("Androstenedione (ng/g)") +
+  theme(text = element_text(size = 15)) +
+  scale_colour_manual(values = c("control" = "#00BFC4", "high" = "#F8766D"), labels = c("control" = "Uncomplicated", "high" = "Adverse"))
+#ggsave(here("images_reviewed", "andr_cerv.png"), andr_cerv, width = 6, height = 6)
+
+```
+
+
+
+
+### Figure with the 3 scatterplots
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+scatterplots<- prog_cerv + cortisol_cerv + andr_cerv + plot_layout(guides = 'collect')
+ggsave(here("images_reviewed", "scatterplots_P_C_A_cerv_lenght.png"), scatterplots, width = 18, height = 6)
+```
+
+
+
+
+
+
+## Difference in steroids levels in term vs preterm
+Analyses performed considering only one sample per patient (select timepoint B for longitudinal ones to balance gestational age of preterm group).
+
+```{r}
+#filter data
+data_lo<- data %>% filter(data$longitudinal =="yes" & data$timepoint == "B")
+data_nolo<- data %>% filter(data$longitudinal =="no")
+
+data_oneeach<- rbind(data_lo, data_nolo)
+```
+
+### Progesterone
+
+```{r}
+#box plot
+boxplot_outcome_prog<- ggplot(data_oneeach, aes(x = data_oneeach$preterm_v_term_1, y = as.numeric(data_oneeach$progesterone_ng_g)))+                 geom_boxplot(aes(fill=data_oneeach$preterm_v_term_1), alpha = 0.8, outlier.shape = NA)+ xlab("Outcome")+ylab("Progesterone")+ theme(legend.position = "none", text = element_text(size = 15))+ scale_fill_manual(values = c("Term"= "#1cd41c", "Preterm"= "#e34a0e"))
+#ggsave(here("images_reviewed", "boxplot_outcome_prog_coloured.png"), boxplot_outcome_prog, width = 6, height = 6)
+
+#statistical summary
+group_by(data_oneeach, preterm_v_term_1) %>%
+  summarise(
+    count = n(),
+    median = median(progesterone_ng_g, na.rm = TRUE),
+    mean=mean(progesterone_ng_g, na.rm = TRUE),
+    IQR = IQR(progesterone_ng_g, na.rm = TRUE),
+    SD = sd(progesterone_ng_g))
+
+#wilcoxon test
+res <- wilcox.test(progesterone_ng_g ~ preterm_v_term_1, data = data_oneeach,
+                   exact = FALSE)
+res
+boxplot_outcome_prog
+```
+
+
+### Cortisol
+
+```{r}
+#box plot
+boxplot_outcome_cort<- ggplot(data_oneeach, aes(x = data_oneeach$preterm_v_term_1, y = as.numeric(data_oneeach$cortisol_ng_g)))+                 geom_boxplot(aes(fill=data_oneeach$preterm_v_term_1), alpha = 0.8, outlier.shape = NA)+ xlab("Outcome")+ylab("Cortisol")+ theme(legend.position = "none", text = element_text(size = 15))+ scale_fill_manual(values = c("Term"= "#1cd41c", "Preterm"= "#e34a0e"))
+#ggsave(here("images_reviewed", "boxplot_outcome_cort_coloured.png"), boxplot_outcome_cort, width = 6, height = 6)
+
+#statistical summary
+group_by(data_oneeach, preterm_v_term_1) %>%
+  summarise(
+    count = n(),
+    median = median(cortisol_ng_g, na.rm = TRUE),
+    mean=mean(cortisol_ng_g, na.rm = TRUE),
+    IQR = IQR(cortisol_ng_g, na.rm = TRUE),
+    SD = sd(cortisol_ng_g))
+
+#wilcoxon test
+res <- wilcox.test(cortisol_ng_g ~ preterm_v_term_1, data = data_oneeach,
+                   exact = FALSE)
+res
+boxplot_outcome_cort
+```
+
+### Androstenedione
+```{r}
+#boxplot
+boxplot_outcome_andr<- ggplot(data_oneeach, aes(x = data_oneeach$preterm_v_term_1, y = as.numeric(data_oneeach$androstenedione_ng_g)))+                 geom_boxplot(aes(fill=data_oneeach$preterm_v_term_1), alpha = 0.8, outlier.shape = NA)+ xlab("Outcome")+ylab("Androstenedione")+ theme(legend.position = "none", text = element_text(size = 15))+ scale_fill_manual(values = c("Term"= "#1cd41c", "Preterm"= "#e34a0e"))
+ggsave(here("images_reviewed", "boxplot_outcome_andr_coloured.png"), boxplot_outcome_andr, width = 6, height = 6)
+
+#statistical summary
+group_by(data_oneeach, preterm_v_term_1) %>%
+  summarise(
+    count = n(),
+    median = median(androstenedione_ng_g, na.rm = TRUE),
+    IQR = IQR(androstenedione_ng_g, na.rm = TRUE),
+    SD = sd(androstenedione_ng_g))
+
+#wilcoxon test
+res <- wilcox.test(androstenedione_ng_g ~ preterm_v_term_1, data = data_oneeach,
+                   exact = FALSE)
+res
+boxplot_outcome_andr
+```
+
+### save image with 3 boxplots
+```{r}
+boxplot_outcome_all<- boxplot_outcome_prog + boxplot_outcome_cort + boxplot_outcome_andr + plot_layout(guides = 'collect')
+ggsave(here("images_reviewed", "boxplot_outcome_P_C_A.png"), boxplot_outcome_all, width = 18, height = 6)
+```
+
+
+```{r}
+# Combine rows
+combined_figure <- scatterplots / boxplot_outcome_all +
+    plot_layout(heights = c(1, 1.2))  # adjust spacing
+
+# Save
+ggsave(here("images_reviewed", "combined_scatter_boxplots_panelAB.png"), 
+       combined_figure, width = 18, height = 12)
+```
+
+
+
+***
+
+
+
+```{r}
+# Convert weeks + days into decimal weeks
+data$gestational_age_delivery_final <- data$gestation_at_delivery + data$gestation_at_delivery_days / 7
+
+# Check
+head(data[, c("gestation_at_delivery", "gestation_at_delivery_days", "gestational_age_delivery_final")])
+
+
+```
+
+```{r}
+
+# Progesterone
+model_prog_gad <- lm(progesterone_ng_g ~ gestational_age_delivery_final, data = data)
+summary(model_prog_gad)
+
+# Cortisol
+model_cort_gad <- lm(cortisol_ng_g ~ gestational_age_delivery_final, data = data)
+summary(model_cort_gad)
+
+# Androstenedione
+model_and_gad <- lm(androstenedione_ng_g ~ gestational_age_delivery_final, data = data)
+summary(model_and_gad)
+
+```
+```{r}
+# Function to extract R², F-statistic, p-value
+get_stats <- function(model){
+  s <- summary(model)
+  R2 <- round(s$r.squared, 3)
+  Fstat <- round(s$fstatistic[1], 3)
+  df1 <- s$fstatistic[2]
+  df2 <- s$fstatistic[3]
+  pval <- signif(pf(Fstat, df1, df2, lower.tail = FALSE), 3)
+  return(list(R2 = R2, Fstat = Fstat, df1 = df1, df2 = df2, pval = pval))
+}
+
+stats_prog <- get_stats(model_prog_gad)
+stats_cort <- get_stats(model_cort_gad)
+stats_and <- get_stats(model_and_gad)
+```
+
+
+
+```{r}
+
+
+# Function to create plot
+plot_steroid <- function(data, yvar, model, stats, ylab){
+  
+  # Prediction frame
+  fake_x <- data.frame(gestational_age_delivery_final = seq(min(data$gestational_age_delivery_final, na.rm = TRUE),
+                                                      max(data$gestational_age_delivery_final, na.rm = TRUE),
+                                                      length.out = 100))
+  prediction <- predict(model, newdata = fake_x)
+  predicted_frame <- cbind(fake_x, prediction)
+  
+  # Label text
+  label_text <- paste0("R² = ", stats$R2, 
+                       "\np = ", stats$pval)
+  
+  # Plot
+  ggplot(data, aes(x = gestational_age_delivery_final, y = !!sym(yvar))) +
+    geom_point(aes(colour = risk_group), size = 3) +
+    geom_line(data = predicted_frame, aes(x = gestational_age_delivery_final, y = prediction), color = "black", linetype= "dashed") +
+    annotate("text", x = min(data$gestational_age_delivery_final, na.rm = TRUE),
+             y = max(data[[yvar]], na.rm = TRUE),
+             label = label_text, hjust = 0, vjust = 1, size = 5) +
+    scale_colour_manual(values = c("control" = "#00BFC4" , "high" = "#F8766D" ), labels = c("control" = "Uncomplicated", "high" = "Adverse"))+
+    labs(x = "Gestational Age at Delivery (weeks)", y = ylab, colour = "Outcome") +
+    theme_minimal() +
+  theme(axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text.x  = element_text(size = 14),
+    axis.text.y  = element_text(size = 14))
+}
+
+# Create plots
+prog_plot <- plot_steroid(data, "progesterone_ng_g", model_prog_gad, stats_prog, "Progesterone (ng/g)")
+cort_plot <- plot_steroid(data, "cortisol_ng_g", model_cort_gad, stats_cort, "Cortisol (ng/g)")
+and_plot <- plot_steroid(data, "androstenedione_ng_g", model_and_gad, stats_and, "Androstenedione (ng/g)")
+
+# Display example
+prog_plot
+cort_plot
+and_plot
+
+
+# Combine plots in a single row
+combined_plot <- prog_plot + cort_plot + and_plot + 
+  plot_layout(guides = "collect") &
+  theme(legend.position = "bottom", legend.title = element_text(size=20), legend.text = element_text(size=20))  # shared legend
+
+# Save
+ggsave(here("images_reviewed", "steroids_vs_gest_age_delivery_noF.png"),
+       combined_plot, width = 18, height = 6)
+
+
+```
+
+
+
+
+### check if a specific patient has anomalous levels of the steroids
+
+
+```{r}
+# Example for progesterone
+patient_sample <- subset(data, sample_id == "2V1592_23+5")
+
+patient_sample
+
+controls <- subset(data, risk_group == "control")
+
+range_prog_ctrl <- range(controls$progesterone_ng_g, na.rm = TRUE)
+range_cort_ctrl <- range(controls$cortisol_ng_g, na.rm = TRUE)
+range_andr_ctrl <- range(controls$androstenedione_ng_g, na.rm = TRUE)
+
+range_prog_ctrl
+range_cort_ctrl
+range_andr_ctrl
+# Check if within range
+prog_in_range <- patient_sample$progesterone_ng_g >= range_prog_ctrl[1] & patient_sample$progesterone_ng_g <= range_prog_ctrl[2]
+cort_in_range <- patient_sample$cortisol_ng_g >= range_cort_ctrl[1] & patient_sample$cortisol_ng_g <= range_cort_ctrl[2]
+andr_in_range <- patient_sample$androstenedione_ng_g >= range_andr_ctrl[1] & patient_sample$androstenedione_ng_g <= range_andr_ctrl[2]
+
+# Print results
+cat("Progesterone within control range:", prog_in_range, "\n")
+cat("Cortisol within control range:", cort_in_range, "\n")
+cat("Androstenedione within control range:", andr_in_range, "\n")
+
+```
+
+
+### Multivariate Regression
+
+```{r}
+
+# Convert risk_group to numeric 0/1
+data_clean$risk_bin <- ifelse(data_clean$risk_group == "high", 1, 0)
+
+# Run logistic regression
+model_multi <- glm(risk_bin ~ progesterone_ng_g + cortisol_ng_g + androstenedione_ng_g, 
+                   data = data_clean, family = binomial)
+summary(model_multi)
+```
+
+
+
+
+```{r}
+
+#adjust for maternal confunders
+
+model_multi_cov <- glm(risk_bin ~ progesterone_ng_g + cortisol_ng_g + androstenedione_ng_g +
+                                      age + bmi + parity, data = data_clean, family = binomial)
+summary(model_multi_cov)
+
+```
+
+### AUC for multivariate logistic model
+
+```{r}
+
+# Load packages
+library(caret)
+library(glmnet)
+library(pROC)
+library(dplyr)
+
+# Prepare modeling dataset
+data_model <- data_clean %>%
+  select(risk_group,
+         progesterone_ng_g,
+         cortisol_ng_g,
+         androstenedione_ng_g,
+         age, bmi, parity) %>%
+  na.omit()
+
+# Ensure outcome is a factor with correct ordering
+data_model$risk_group <- factor(
+  data_model$risk_group,
+  levels = c("control", "high")
+)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Define 3-fold cross-validation
+ctrl <- trainControl(
+  method = "cv",
+  number = 3,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,
+  savePredictions = TRUE
+)
+
+# Train logistic regression via caret (glmnet with no regularization)
+model_cv <- train(
+  risk_group ~ progesterone_ng_g +
+               cortisol_ng_g +
+               androstenedione_ng_g +
+               age + bmi + parity,
+  data = data_model,
+  method = "glmnet",
+  metric = "ROC",
+  trControl = ctrl,
+  tuneGrid = expand.grid(
+    alpha = 0,
+    lambda = 0
+  ),
+  family = "binomial"
+)
+
+# Extract cross-validated ROC AUC
+cv_auc <- max(model_cv$results$ROC)
+print(paste("3-fold cross-validated ROC AUC:", round(cv_auc, 3)))
+
+# Plot ROC curve
+roc_obj <- roc(
+  response = model_cv$pred$obs,
+  predictor = model_cv$pred$high
+)
+
+plot(
+  roc_obj,
+  main = paste("Cross-validated ROC AUC =", round(cv_auc, 3)),
+  lwd = 3
+)
+
+
+png(here("images_reviewed", "cross_validated_ROC.png"),
+width = 6, height = 6, units = "in", res = 300)
+
+plot(
+roc_obj,
+main = paste("Cross-validated ROC AUC =", round(cv_auc, 3)),
+lwd = 3
+)
+
+dev.off()
+
+```
+
+
+
+
+
+
+
+```{r}
+pca_res <- prcomp(data_clean[, c("progesterone_ng_g","cortisol_ng_g","androstenedione_ng_g")], scale = TRUE)
+scores <- as.data.frame(pca_res$x)
+scores$risk_group <- data_clean$risk_group
+
+library(ggplot2)
+pca_plot<- ggplot(scores, aes(x = PC1, y = PC2, color = risk_group)) +
+  geom_point(size = 4) + 
+    scale_colour_manual(values = c("control" = "#00BFC4" , "high" = "#F8766D" ), labels = c("control" = "Uncomplicated", "high" = "Adverse"))+
+  theme_minimal()+ labs(colour = "Outcome") +
+  labs( x = paste0("PC1 (", round(var_exp[1], 1),"%)"),
+    y = paste0("PC2 (", round(var_exp[2], 1), "%)")) +
+  theme_minimal() +  theme(axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text.x  = element_text(size = 14),
+    axis.text.y  = element_text(size = 14), legend.title = element_text(size=18), legend.text = element_text(size=18))
+
+ggsave(here("images_reviewed", "PCA_multivariate_adjusted.png"),
+       pca_plot, width = 8, height = 6)
+
+
+```
+
+
+
+```{r}
+# Proportion of variance explained
+pca_var <- summary(pca_res)$importance[2, ]  # 2nd row = Proportion of Variance
+pca_var
+
+# Loadings
+pca_res$rotation
+
+
+
+```
+```{r}
+loadings <- as.data.frame(pca_res$rotation[, 1:2])
+loadings$analyte <- rownames(pca_res$rotation)
+
+# Apply renaming
+loadings$analyte <- analyte_names[loadings$analyte]
+loadings$analyte <- rownames(loadings)
+
+loadings$analyte <- dplyr::recode(
+  loadings$analyte,
+  progesterone_ng_g    = "Progesterone",
+  cortisol_ng_g        = "Cortisol",
+  androstenedione_ng_g = "Androstenedione")
+
+# Scaling factor
+arrow_scale <- min(
+  diff(range(scores$PC1)),
+  diff(range(scores$PC2))) * 0.7
+
+loadings$PC1 <- loadings$PC1 * arrow_scale
+loadings$PC2 <- loadings$PC2 * arrow_scale
+
+
+pca_plot_loadings <- ggplot(scores, aes(x = PC1, y = PC2, color = risk_group)) +
+  geom_point(size = 4) +
+
+  # Loadings arrows
+  geom_segment(
+    data = loadings,
+    aes(x = 0, y = 0, xend = PC1, yend = PC2),
+    arrow = arrow(length = unit(0.25, "cm")),
+    inherit.aes = FALSE,
+    color = "black" ) +
+
+  # Loadings labels
+  geom_text(
+    data = loadings,
+    aes(x = PC1, y = PC2, label = analyte),
+    inherit.aes = FALSE,
+    size = 5,
+    vjust = -0.5) +
+
+  scale_colour_manual(
+    values = c("control" = "#00BFC4", "high" = "#F8766D"),
+    labels = c("control" = "Uncomplicated", "high" = "Adverse")
+  ) +
+
+  labs(
+    x = paste0("PC1 (", round(var_exp[1], 1), "%)"),
+    y = paste0("PC2 (", round(var_exp[2], 1), "%)"), colour = "Outcome"
+  ) +
+
+  theme_minimal()+  theme(axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text.x  = element_text(size = 14),
+    axis.text.y  = element_text(size = 14), legend.title = element_text(size=18), legend.text = element_text(size=18))
+
+
+
+ggsave(here("images_reviewed", "PCA_multivariate_adjusted.png"),
+       pca_plot_loadings, width = 8, height = 6)
+
+
+
+
+
+```
+
+
+
+
+
+
+***
+
+
+## Variation of CVF fluid weight collected with gestational age
+Analyse if there is a significant difference in the weight of the CVF collected according to the gestational age
+
+```{r}
+#linear model weight vs gestational age
+model<- lm(weight_g ~ gestational_age_final , data= data)
+summary(model)
+
+#create dataframe with prediction and fake gestational age (I added some manually so I could do cbind with the values)
+fake_gest_age <- data.frame(gestational_age_final = c(seq(12.5, 25.5, by = 0.005)))
+prediction<- predict(model, newdata=fake_gest_age)
+predicted_frame<-cbind(fake_gest_age, prediction)
+
+#plot
+prog_scatterplot_all<- ggplot(data, aes(x=gestational_age_final, y=weight_g)) + geom_point(size = 4)+ geom_line(data=predicted_frame, aes(x=gestational_age_final, y=prediction))+ labs(colour= "Outcome")+ xlab("Gestational Age")+ylab("CVF weight")+ theme(text = element_text(size = 25)) 
+
+ggsave(here("images", "weight_gestational_age.png"), prog_scatterplot_all, width = 8, height = 8)
+
+prog_scatterplot_all
+```
+
+
+## Different weight for longitudinal sample timepoint A and B
+```{r}
+
+data_total_paired<- data %>% filter(data$longitudinal =="yes")
+
+weight_timepoint_A_B<- ggplot(data_total_paired, aes(x = data_total_paired$timepoint, y = data_total_paired$weight_g))+ geom_boxplot(aes(fill=data_total_paired$timepoint), alpha = 0.4, outlier.shape = NA)+ xlab("Timepoint")+ylab("CVF weight")+theme(legend.position = "none")+ theme(text = element_text(size = 20)) 
+ggsave(here("images", "weight_timepoint_A_B.png"), weight_timepoint_A_B, width = 8, height = 8)
+
+#transform timepoint in numeric to do the analysis
+numeric_timepoint <- ifelse(data_total_paired$timepoint == "A", 1, 2)
+res_a <- wilcox.test(numeric_timepoint, data_total_paired$weight_g, data= data,
+                   exact = FALSE, paired = TRUE, alternative = "two.sided")
+res_a$p.value
+```
+
+***
+
+
+***
+
+## Analysis with values expressed in ng/ml
+Repeat the basic analysis with the value recalculated in unit ng/ml
+```{r}
+
+hormones_ng_ml<- read.csv(here("hormones_ng_ml.csv"))
+
+hormones_ng_ml<- clean_names(hormones_ng_ml)
+
+data_ng_ml<-merge(metadata, hormones_ng_ml, by= "sample_id")
+
+data_ng_ml<- data_ng_ml %>% mutate (preterm_v_term_1 = case_when(preterm_v_term == "Preterm" ~ "Preterm",
+                                                     preterm_v_term == "Miscarriage" ~ "Preterm",
+                                                     preterm_v_term == "Term" ~ "Term")) %>% relocate(preterm_v_term_1, .after = preterm_v_term)
+```
+
+
+
+### measurment of steroids only in low risk samples
+```{r}
+
+data_low_risk<- data_ng_ml %>% filter(data_ng_ml$risk_group == "control" & data_ng_ml$preterm_v_term_1 == "Term")
+
+summary_P<- data_low_risk %>%
+  summarise(
+    count = n(),
+    min = min(data_low_risk$progesterone_ng_ml, na.rm = TRUE),
+    median = median(data_low_risk$progesterone_ng_ml, na.rm = TRUE),
+    max = max(data_low_risk$progesterone_ng_ml, na.rm = TRUE),
+    sd = sd(data_low_risk$progesterone_ng_ml, na.rm = TRUE),
+    IQR = IQR(data_low_risk$progesterone_ng_ml, na.rm = TRUE))
+
+summary_C<- data_low_risk %>%
+  summarise(
+    count = n(),
+    min = min(data_low_risk$cortisol_ng_ml, na.rm = TRUE),
+    median = median(data_low_risk$cortisol_ng_ml, na.rm = TRUE),
+    max = max(data_low_risk$cortisol_ng_ml, na.rm = TRUE),
+    sd = sd(data_low_risk$cortisol_ng_ml, na.rm = TRUE),
+    IQR = IQR(data_low_risk$cortisol_ng_ml, na.rm = TRUE))
+
+summary_A<- data_low_risk %>%
+  summarise(
+    count = n(),
+    min = min(data_low_risk$androstenedione_ng_ml, na.rm = TRUE),
+    median = median(data_low_risk$androstenedione_ng_ml, na.rm = TRUE),
+    max = max(data_low_risk$androstenedione_ng_ml, na.rm = TRUE),
+    sd = sd(data_low_risk$androstenedione_ng_ml, na.rm = TRUE),
+    IQR = IQR(data_low_risk$androstenedione_ng_ml, na.rm = TRUE))
+
+write.csv(rbind(summary_P, summary_C, summary_A), here("images","summary_levels_NG_ML_controls.csv"))
+
+
+
+P <- ggplot(data_low_risk, aes(x = 1, y = data_low_risk$progesterone_ng_ml)) +
+     geom_boxplot(fill = "#4682b4") +
+     geom_jitter(width = 0.2, height = 0, color = "black", alpha = 0.5) +
+     scale_x_continuous(breaks = NULL) +
+     xlab("Progesterone") + ylab("ng/ml") +
+     theme(legend.position = "none") +
+     ylim(0, 10)
+ggsave(here("images", "progesterone_levels_ng_ml.png"), P, width = 3, height = 8)
+
+C <- ggplot(data_low_risk, aes(x = 1, y = data_low_risk$cortisol_ng_ml)) +
+     geom_boxplot(fill = "#4682b4") +
+     geom_jitter(width = 0.2, height = 0, color = "black", alpha = 0.5) +
+     scale_x_continuous(breaks = NULL) +
+     xlab("Cortisol") + ylab("ng/ml") +
+     theme(legend.position = "none") +
+     ylim(0, 10)
+ggsave(here("images", "cortisol_levels_ng_ml.png"), C, width = 3, height = 8)
+
+A <- ggplot(data_low_risk, aes(x = 1, y = data_low_risk$androstenedione_ng_ml)) +
+     geom_boxplot(fill = "#4682b4") +
+     geom_jitter(width = 0.2, height = 0, color = "black", alpha = 0.5) +
+     scale_x_continuous(breaks = NULL) +
+     xlab("Androstenedione") + ylab("ng/ml") +
+     theme(legend.position = "none") +
+     ylim(0, 10)
+ggsave(here("images", "androstenedione_levels_ng_ml.png"), A, width = 3, height = 8)
+
+
+side_by_side<- P + C + A
+ggsave(here("images", "prog_cort_and_levels_controls_ng_ml.png"), side_by_side, width = 8, height = 8)
+
+```
+
+
+
