@@ -1,7 +1,7 @@
 ---
 title: "Steroid targeted assay analyses"
 output: html_document
-date: "2022-10-23"
+date: "2026-04-25"
 ---
 
 ### Load libraries
@@ -29,18 +29,18 @@ Load metadata file ("metadata.csv") containing patients info including Subject I
 Load steroids levels files ("hormones_values_final.csv") containing final values calculated with adjustment for sample weight. A detailed explanation of the calculations done is in the file named "hormones_calculations.csv".
 ```{r, echo=TRUE, message=FALSE, warning=FALSE}
 #Load metadata
-metadata<- read.csv(here("metadata.csv"))
-metadata<- clean_names(metadata)
+metadata <- read.csv(here("metadata.csv"))
+metadata <- clean_names(metadata)
 
 #Load steroids values
-hormones<- read.csv((here("hormones_values_final.csv")))
-hormones<- clean_names(hormones)
+hormones <- read.csv((here("hormones_values_final.csv")))
+hormones <- clean_names(hormones)
 
 #Merge by sample_id
 data <- merge(metadata, hormones, by="sample_id")
 
 #Recode Miscarriage (n=1) as preterm
-data<- data %>% mutate (preterm_v_term_1 = case_when(preterm_v_term == "Preterm" ~ "Preterm",
+data <- data %>% mutate (preterm_v_term_1 = case_when(preterm_v_term == "Preterm" ~ "Preterm",
                                                      preterm_v_term == "Miscarriage" ~ "Preterm",
                                                      preterm_v_term == "Term" ~ "Term")) %>%
                                            relocate(preterm_v_term_1, .after = preterm_v_term)
@@ -236,10 +236,13 @@ Fstat <- round(s$fstatistic[1], 3)
 df1 <- s$fstatistic[2]
 df2 <- s$fstatistic[3]
 pval <- signif(pf(s$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+slope <- round(coef(model)[2], 3)
+intercept <- round(coef(model)[1], 3)
+eq <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
 
 # Create label
-label_text <- paste0("R² = ", R2,
-                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+label_text <- paste0("r² = ", R2,
+                     "\n", eq,
                      "\np = ", pval)
 
 #create dataframe with prediction and fake gestational age (I added some manually so I could do cbind with the values)
@@ -276,10 +279,13 @@ Fstat <- round(sc$fstatistic[1], 3)
 df1 <- sc$fstatistic[2]
 df2 <- sc$fstatistic[3]
 pval <- signif(pf(sc$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+slope <- round(coef(model_cort)[2], 3)
+intercept <- round(coef(model_cort)[1], 3)
+eq <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
 
 # Create label
-label_text <- paste0("R² = ", R2,
-                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+label_text <- paste0("r² = ", R2,
+                     "\n", eq,
                      "\np = ", pval)
 
 
@@ -317,10 +323,13 @@ Fstat <- round(sa$fstatistic[1], 3)
 df1 <- sa$fstatistic[2]
 df2 <- sa$fstatistic[3]
 pval <- signif(pf(sa$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+slope <- round(coef(model_and)[2], 3)
+intercept <- round(coef(model_and)[1], 3)
+eq <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
 
 # Create label
-label_text <- paste0("R² = ", R2,
-                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+label_text <- paste0("r² = ", R2,
+                     "\n", eq,
                      "\np = ", pval)
 
 
@@ -389,9 +398,11 @@ group_by(data_paired, timepoint) %>%
 prog_timepoint_A_B<- ggplot(data_paired, aes(x = data_paired$timepoint, y = as.numeric(data_paired$progesterone_ng_g)))+ geom_boxplot(aes(fill=data_paired$timepoint), alpha = 0.8, outlier.shape = NA)+ xlab("Timepoint")+ylab("Progesterone")+theme(legend.position = "none")+ theme(text = element_text(size = 30))  + scale_fill_manual(values = c("A" = "#a5e35d", "B" = "#388E3C"))+ ylim(0, 20)
 #ggsave(here("images_reviewed", "prog_timepoint_A_B_coloured.png"), prog_timepoint_A_B, width = 8, height = 8)
 
-#t-test
-numeric_timepoint <- ifelse( data_paired$timepoint == "A", 1, 2)
-result <- t.test(data_paired$progesterone_ng_g, numeric_timepoint, paired = TRUE)
+#paired t-test: A vs B per subject (paired by cons_v2)
+wide_prog <- data_paired %>%
+  select(cons_v2, timepoint, progesterone_ng_g) %>%
+  pivot_wider(names_from = timepoint, values_from = progesterone_ng_g)
+result <- t.test(wide_prog$A, wide_prog$B, paired = TRUE)
 result$p.value
 
 individuals_prog
@@ -418,9 +429,11 @@ group_by(data_paired, timepoint) %>%
 cort_timepoint_A_B<- ggplot(data_paired, aes(x = data_paired$timepoint, y = as.numeric(data_paired$cortisol_ng_g)))+ geom_boxplot(aes(fill=data_paired$timepoint), alpha = 0.8, outlier.shape = NA)+ xlab("Timepoint")+ylab("Cortisol")+theme(legend.position = "none")+ theme(text = element_text(size = 30)) + scale_fill_manual(values = c("A" = "#a5e35d", "B" = "#388E3C"))
 #ggsave(here("images_reviewed", "cort_timepoint_A_B_coloured.png"), cort_timepoint_A_B, width = 8, height = 8)
 
-#t-test
-numeric_timepoint <- ifelse( data_paired$timepoint == "A", 1, 2)
-result <- t.test(data_paired$cortisol_ng_g, numeric_timepoint, paired = TRUE)
+#paired t-test: A vs B per subject (paired by cons_v2)
+wide_cort <- data_paired %>%
+  select(cons_v2, timepoint, cortisol_ng_g) %>%
+  pivot_wider(names_from = timepoint, values_from = cortisol_ng_g)
+result <- t.test(wide_cort$A, wide_cort$B, paired = TRUE)
 result$p.value
 
 individuals_cort
@@ -447,9 +460,11 @@ group_by(data_paired, timepoint) %>%
 andr_timepoint_A_B<- ggplot(data_paired, aes(x = data_paired$timepoint, y = as.numeric(data_paired$androstenedione_ng_g)))+ geom_boxplot(aes(fill=data_paired$timepoint), alpha = 0.8, outlier.shape = NA)+ xlab("Timepoint")+ylab("Androstenedione")+theme(legend.position = "none")+ theme(text = element_text(size = 30)) + scale_fill_manual(values = c("A" = "#a5e35d", "B" = "#388E3C"))
 #ggsave(here("images_reviewed", "andr_timepoint_A_B_coloured.png"), andr_timepoint_A_B, width = 8, height = 8)
 
-#t-test
-numeric_timepoint <- ifelse(data_paired$timepoint == "A", 1, 2)
-result <- t.test(data_paired$androstenedione_ng_g, numeric_timepoint, paired = TRUE)
+#paired t-test: A vs B per subject (paired by cons_v2)
+wide_andr <- data_paired %>%
+  select(cons_v2, timepoint, androstenedione_ng_g) %>%
+  pivot_wider(names_from = timepoint, values_from = androstenedione_ng_g)
+result <- t.test(wide_andr$A, wide_andr$B, paired = TRUE)
 result$p.value
 
 individuals_andr
@@ -482,14 +497,17 @@ Fstat <- round(s$fstatistic[1], 3)
 df1 <- s$fstatistic[2]
 df2 <- s$fstatistic[3]
 pval <- signif(pf(s$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+slope <- round(coef(model_cl)[2], 3)
+intercept <- round(coef(model_cl)[1], 3)
+eq <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
 
-label_text <- paste0("R² = ", R2,
-                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+label_text <- paste0("r² = ", R2,
+                     "\n", eq,
                      "\np = ", pval)
 
 # Prediction frame
-fake_cl <- data.frame(cl_visit = seq(min(data_clean$cl_visit), 
-                                     max(data_clean$cl_visit), 
+fake_cl <- data.frame(cl_visit = seq(min(data_clean$cl_visit),
+                                     max(data_clean$cl_visit),
                                      length.out = 100))
 prediction <- predict(model_cl, newdata = fake_cl)
 predicted_frame <- cbind(fake_cl, prediction)
@@ -522,9 +540,12 @@ Fstat <- round(s$fstatistic[1], 3)
 df1 <- s$fstatistic[2]
 df2 <- s$fstatistic[3]
 pval <- signif(pf(s$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+slope <- round(coef(model_cort)[2], 3)
+intercept <- round(coef(model_cort)[1], 3)
+eq <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
 
-label_text <- paste0("R² = ", R2,
-                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+label_text <- paste0("r² = ", R2,
+                     "\n", eq,
                      "\np = ", pval)
 
 fake_cl <- data.frame(cl_visit = seq(min(data_clean$cl_visit), max(data_clean$cl_visit), length.out = 100))
@@ -555,9 +576,12 @@ Fstat <- round(s$fstatistic[1], 3)
 df1 <- s$fstatistic[2]
 df2 <- s$fstatistic[3]
 pval <- signif(pf(s$fstatistic[1], df1, df2, lower.tail = FALSE), 3)
+slope <- round(coef(model_and)[2], 3)
+intercept <- round(coef(model_and)[1], 3)
+eq <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
 
-label_text <- paste0("R² = ", R2,
-                     "\nF(", df1, ", ", df2, ") = ", Fstat,
+label_text <- paste0("r² = ", R2,
+                     "\n", eq,
                      "\np = ", pval)
 
 fake_cl <- data.frame(cl_visit = seq(min(data_clean$cl_visit), max(data_clean$cl_visit), length.out = 100))
@@ -728,7 +752,10 @@ get_stats <- function(model){
   df1 <- s$fstatistic[2]
   df2 <- s$fstatistic[3]
   pval <- signif(pf(Fstat, df1, df2, lower.tail = FALSE), 3)
-  return(list(R2 = R2, Fstat = Fstat, df1 = df1, df2 = df2, pval = pval))
+  slope <- round(coef(model)[2], 3)
+  intercept <- round(coef(model)[1], 3)
+  return(list(R2 = R2, Fstat = Fstat, df1 = df1, df2 = df2, pval = pval,
+              slope = slope, intercept = intercept))
 }
 
 stats_prog <- get_stats(model_prog_gad)
@@ -752,7 +779,10 @@ plot_steroid <- function(data, yvar, model, stats, ylab){
   predicted_frame <- cbind(fake_x, prediction)
   
   # Label text
-  label_text <- paste0("R² = ", stats$R2, 
+  eq <- paste0("y = ", stats$slope, "x ",
+               ifelse(stats$intercept >= 0, "+ ", "- "), abs(stats$intercept))
+  label_text <- paste0("r² = ", stats$R2,
+                       "\n", eq,
                        "\np = ", stats$pval)
   
   # Plot
@@ -912,29 +942,36 @@ model_cv <- train(
 cv_auc <- max(model_cv$results$ROC)
 print(paste("3-fold cross-validated ROC AUC:", round(cv_auc, 3)))
 
-# Plot ROC curve
-roc_obj <- roc(
-  response = model_cv$pred$obs,
-  predictor = model_cv$pred$high
+# Plot ROC curve (ggplot version via plotROC)
+library(plotROC)
+
+roc_df <- data.frame(
+  d = ifelse(model_cv$pred$obs == "high", 1, 0),
+  m = model_cv$pred$high
 )
 
-plot(
-  roc_obj,
-  main = paste("Cross-validated ROC AUC =", round(cv_auc, 3)),
-  lwd = 3
-)
+roc_plot <- ggplot(roc_df, aes(d = d, m = m)) +
+  geom_roc(n.cuts = 0, color = "#F8766D", size = 1.1) +
+  geom_abline(slope = 1, intercept = 0,
+              linetype = "dashed", color = "grey60") +
+  coord_equal() +
+  labs(x = "1 - Specificity",
+       y = "Sensitivity",
+       title = paste0("Cross-validated ROC (AUC = ",
+                      round(cv_auc, 3), ")")) +
+  annotate("text", x = 0.65, y = 0.10,
+           label = paste0("AUC = ", round(cv_auc, 3)),
+           size = 6) +
+  theme_minimal() +
+  theme(plot.title    = element_text(size = 16, hjust = 0.5),
+        axis.title    = element_text(size = 14),
+        axis.text     = element_text(size = 12),
+        panel.grid.minor = element_blank())
 
+roc_plot
 
-png(here("images_reviewed", "cross_validated_ROC.png"),
-width = 6, height = 6, units = "in", res = 300)
-
-plot(
-roc_obj,
-main = paste("Cross-validated ROC AUC =", round(cv_auc, 3)),
-lwd = 3
-)
-
-dev.off()
+ggsave(here("images_reviewed", "cross_validated_ROC.png"),
+       roc_plot, width = 6, height = 6, dpi = 300)
 
 ```
 
@@ -1086,10 +1123,12 @@ data_total_paired<- data %>% filter(data$longitudinal =="yes")
 weight_timepoint_A_B<- ggplot(data_total_paired, aes(x = data_total_paired$timepoint, y = data_total_paired$weight_g))+ geom_boxplot(aes(fill=data_total_paired$timepoint), alpha = 0.4, outlier.shape = NA)+ xlab("Timepoint")+ylab("CVF weight")+theme(legend.position = "none")+ theme(text = element_text(size = 20)) 
 ggsave(here("images", "weight_timepoint_A_B.png"), weight_timepoint_A_B, width = 8, height = 8)
 
-#transform timepoint in numeric to do the analysis
-numeric_timepoint <- ifelse(data_total_paired$timepoint == "A", 1, 2)
-res_a <- wilcox.test(numeric_timepoint, data_total_paired$weight_g, data= data,
-                   exact = FALSE, paired = TRUE, alternative = "two.sided")
+#paired Wilcoxon: A vs B per subject (paired by cons_v2)
+wide_weight <- data_total_paired %>%
+  select(cons_v2, timepoint, weight_g) %>%
+  pivot_wider(names_from = timepoint, values_from = weight_g)
+res_a <- wilcox.test(wide_weight$A, wide_weight$B,
+                     exact = FALSE, paired = TRUE, alternative = "two.sided")
 res_a$p.value
 ```
 
