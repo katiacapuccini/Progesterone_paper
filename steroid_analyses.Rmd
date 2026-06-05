@@ -1431,3 +1431,27 @@ ggsave(here("images", "prog_cort_and_levels_controls_ng_ml.png"), side_by_side,
 
 
 
+
+
+
+
+```{r}
+# Addition of LMEM to investigate relationship of main steroids and gestational age for all samples
+
+library(lme4)
+
+data$SubjectID <- factor(data$cons_v2)
+
+model_prog_lmm <- lmer(progesterone_ng_g ~ gestational_age_final + (1|SubjectID), data=data, REML=TRUE)
+
+model_cort_lmm <- lmer(cortisol_ng_g ~ gestational_age_final + (1|SubjectID), data=data,REML=TRUE)
+
+model_and_lmm <- lmer(androstenedione_ng_g ~ gestational_age_final + (1|SubjectID), data=data, REML=TRUE)
+
+summary(model_prog_lmm)
+summary(model_cort_lmm)
+summary(model_and_lmm)
+
+```
+
+
