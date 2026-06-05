@@ -1434,10 +1434,8 @@ ggsave(here("images", "prog_cort_and_levels_controls_ng_ml.png"), side_by_side,
 
 
 
-
-```{r}
 # Addition of LMEM to investigate relationship of main steroids and gestational age for all samples
-
+```{r}
 library(lme4)
 
 data$SubjectID <- factor(data$cons_v2)
