@@ -1,7 +1,7 @@
 ---
 title: "Steroid targeted assay analyses"
 output: html_document
-date: "2026-04-25"
+date: "2026-06-12"
 ---
 
 ```{r setup, include=FALSE}
@@ -24,6 +24,9 @@ library(magick)
 library(caret)
 library(glmnet)
 library(pROC)
+library(lme4)
+library(lmerTest)
+library(MuMIn)
 
 
 # global publication theme
@@ -615,9 +618,121 @@ individuals_andr
 andr_timepoint_A_B
 ``` 
 
+# Relationship of main steroids and gestational age (linear mixed models)
+Gestational-age analysis using linear-mixed effect models.
+```{r}
+data$SubjectID <- factor(data$cons_v2)
+
+model_prog_lmm <- lmer(progesterone_ng_g ~ gestational_age_final + (1|SubjectID), data=data, REML=TRUE)
+
+model_cort_lmm <- lmer(cortisol_ng_g ~ gestational_age_final + (1|SubjectID), data=data,REML=TRUE)
+
+model_and_lmm <- lmer(androstenedione_ng_g ~ gestational_age_final + (1|SubjectID), data=data, REML=TRUE)
+
+summary(model_prog_lmm)
+summary(model_cort_lmm)
+summary(model_and_lmm)
+```
+
+## Progesterone (LMM)
+```{r}
+# statistics
+prog_fix <- fixef(model_prog_lmm)
+R2 <- round(MuMIn::r.squaredGLMM(model_prog_lmm)[1],3)
+pval <- signif(coef(summary(model_prog_lmm))["gestational_age_final","Pr(>|t|)"  ], 3)
+
+slope <- round(prog_fix["gestational_age_final"], 3)
+intercept <- round(prog_fix["(Intercept)"], 3)
+
+eq <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
+label_text <- paste0("  r² = ", R2, "\n  ", eq, "\n  p = ", pval)
+
+# prediction grid
+fake_gest_age <- data.frame(gestational_age_final = seq(12.5, 25.5, by = 0.005))
+
+prediction <- predict(model_prog_lmm, newdata = fake_gest_age, re.form = NA)
+
+predicted_frame <- cbind(fake_gest_age, prediction)
+
+prog_scatterplot_lmm <- ggplot(data, aes(x = gestational_age_final, y = progesterone_ng_g)) +
+  geom_point(aes(colour = risk_group), size = 2.2,alpha = 0.85) +
+  geom_line(data = predicted_frame, aes( x = gestational_age_final, y = prediction), colour = "black", linewidth = 0.5) +
+  annotate("text",x = -Inf,  y = Inf, label = label_text, hjust = 0, vjust = 1.2, size = 3.2, lineheight = 0.95) +
+  labs(colour = "Outcome") + xlab("Gestational Age (weeks)") +
+  ylab("Progesterone (ng/g)") +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.20)))+
+  scale_colour_manual(values = risk_cols, labels = risk_labels)
+
+prog_scatterplot_lmm
+```
+
+## Cortisol (LMM)
+```{r}
+# statistics
+cort_fix <- fixef(model_cort_lmm)
+R2 <- round(MuMIn::r.squaredGLMM(model_cort_lmm)[1],3)
+pval <- signif(coef(summary(model_cort_lmm))["gestational_age_final","Pr(>|t|)"],3)
+
+slope <- round(cort_fix["gestational_age_final"], 3)
+intercept <- round(cort_fix["(Intercept)"], 3)
+
+eq <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
+label_text <- paste0("  r² = ", R2,"\n  ", eq, "\n  p = ", pval)
+
+# prediction grid
+fake_gest_age <- data.frame(gestational_age_final = seq(12.5, 25.5, by = 0.005))
+
+prediction <- predict(model_cort_lmm, newdata = fake_gest_age, re.form = NA)
+
+predicted_frame <- cbind(fake_gest_age, prediction)
+
+cort_scatterplot_lmm <- ggplot(data,aes(x = gestational_age_final,y = cortisol_ng_g)) +
+  geom_point(aes(colour = risk_group),size = 2.2, alpha = 0.85) +
+  geom_line(data = predicted_frame, aes(x = gestational_age_final, y = prediction),
+    colour = "black", linewidth = 0.5) +
+  annotate("text", x = -Inf, y = Inf, label = label_text, hjust = 0, vjust = 1.2,
+    size = 3.2, lineheight = 0.95 ) + labs(colour = "Outcome") +
+  xlab("Gestational Age (weeks)") +
+  ylab("Cortisol (ng/g)") + scale_y_continuous(expand = expansion(mult = c(0.05, 0.20)))+
+  scale_colour_manual(values = risk_cols,labels = risk_labels)
+
+
+cort_scatterplot_lmm
+```
+
+## Androstenedione (LMM)
+```{r}
+# statistics
+and_fix <- fixef(model_and_lmm)
+R2 <- round(MuMIn::r.squaredGLMM(model_and_lmm)[1], 3)
+pval <- signif(coef(summary(model_and_lmm))["gestational_age_final", "Pr(>|t|)"], 3)
+
+slope <- round(and_fix["gestational_age_final"], 3)
+intercept <- round(and_fix["(Intercept)"], 3)
+
+eq <- paste0( "y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
+label_text <- paste0( "  r² = ", R2,"\n  ", eq, "\n  p = ", pval)
+
+# prediction grid
+fake_gest_age <- data.frame(gestational_age_final = seq(12.5, 25.5, by = 0.005))
+prediction <- predict(model_and_lmm, newdata = fake_gest_age, re.form = NA)
+predicted_frame <- cbind( fake_gest_age, prediction)
+
+androst_scatterplot_lmm <- ggplot(data,
+  aes(x = gestational_age_final, y = androstenedione_ng_g)) +
+  geom_point(aes(colour = risk_group),size = 2.2, alpha = 0.85) +
+  geom_line(data = predicted_frame, aes(x = gestational_age_final, y = prediction), colour = "black", linewidth = 0.5) +
+annotate("text",x = -Inf, y = Inf,label = label_text, hjust = 0, vjust = 1.2, size = 3.2, lineheight = 0.95) +
+  labs(colour = "Outcome") +  xlab("Gestational Age (weeks)") +
+  ylab("Androstenedione (ng/g)") +  scale_y_continuous(expand = expansion(mult = c(0.05, 0.20)))+
+  scale_colour_manual(values = risk_cols, labels = risk_labels)
+
+androst_scatterplot_lmm
+```
+
 # Figure 2
 ```{r}
-row_a <- prog_scatterplot   + cort_scatterplot   + androst_scatterplot
+row_a <- prog_scatterplot_lmm + cort_scatterplot_lmm + androst_scatterplot_lmm
 row_b <- individuals_prog   + individuals_cort   + individuals_andr
 row_c <- prog_timepoint_A_B + cort_timepoint_A_B + andr_timepoint_A_B
 
@@ -787,6 +902,103 @@ ggsave(here("images_reviewed", "scatterplots_P_C_A_cerv_lenght.png"), scatterplo
 ```
 
 
+# Cervical length and steroids (linear mixed models)
+LMM version of the cervical length analyses
+
+## Progesterone (LMM)
+```{r}
+model_prog_cl_lmm <- lmer(progesterone_ng_g ~ cl_visit + (1|SubjectID), data = data_clean, REML = TRUE)
+
+prog_fix  <- fixef(model_prog_cl_lmm)
+R2        <- round(MuMIn::r.squaredGLMM(model_prog_cl_lmm)[1], 3)
+pval      <- signif(coef(summary(model_prog_cl_lmm))["cl_visit", "Pr(>|t|)"], 3)
+slope     <- round(prog_fix["cl_visit"], 3)
+intercept <- round(prog_fix["(Intercept)"], 3)
+eq         <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
+label_text <- paste0("  r² = ", R2, "\n  ", eq, "\n  p = ", pval)
+
+fake_cl <- data.frame(cl_visit = seq(min(data_clean$cl_visit), max(data_clean$cl_visit), length.out = 100))
+prediction <- predict(model_prog_cl_lmm, newdata = fake_cl, re.form = NA)
+predicted_frame <- cbind(fake_cl, prediction)
+
+prog_cerv_lmm <- ggplot(data_clean, aes(x = cl_visit, y = progesterone_ng_g)) +
+  geom_point(aes(colour = risk_group), size = 2.2, alpha = 0.85) +
+  geom_line(data = predicted_frame, aes(x = cl_visit, y = prediction),
+            colour = "black", linewidth = 0.5) +
+  annotate("text", x = -Inf, y = Inf, label = label_text, hjust = 0, vjust = 1.2,
+           size = 3.2, lineheight = 0.95) +
+  labs(colour = "Outcome") +
+  xlab("Cervical Length (mm)") +
+  ylab("Progesterone (ng/g)") +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.20))) +
+  scale_colour_manual(values = risk_cols, labels = risk_labels)
+
+prog_cerv_lmm
+```
+
+## Cortisol (LMM)
+```{r}
+model_cort_cl_lmm <- lmer(cortisol_ng_g ~ cl_visit + (1|SubjectID), data = data_clean, REML = TRUE)
+
+cort_fix  <- fixef(model_cort_cl_lmm)
+R2        <- round(MuMIn::r.squaredGLMM(model_cort_cl_lmm)[1], 3)
+pval      <- signif(coef(summary(model_cort_cl_lmm))["cl_visit", "Pr(>|t|)"], 3)
+slope     <- round(cort_fix["cl_visit"], 3)
+intercept <- round(cort_fix["(Intercept)"], 3)
+eq         <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
+label_text <- paste0("  r² = ", R2, "\n  ", eq, "\n  p = ", pval)
+
+fake_cl <- data.frame(cl_visit = seq(min(data_clean$cl_visit), max(data_clean$cl_visit), length.out = 100))
+prediction <- predict(model_cort_cl_lmm, newdata = fake_cl, re.form = NA)
+predicted_frame <- cbind(fake_cl, prediction)
+
+cortisol_cerv_lmm <- ggplot(data_clean, aes(x = cl_visit, y = cortisol_ng_g)) +
+  geom_point(aes(colour = risk_group), size = 2.2, alpha = 0.85) +
+  geom_line(data = predicted_frame, aes(x = cl_visit, y = prediction),
+            colour = "black", linewidth = 0.5) +
+  annotate("text", x = -Inf, y = Inf, label = label_text, hjust = 0, vjust = 1.2,
+           size = 3.2, lineheight = 0.95) +
+  labs(colour = "Outcome") +
+  xlab("Cervical Length (mm)") +
+  ylab("Cortisol (ng/g)") +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.20))) +
+  scale_colour_manual(values = risk_cols, labels = risk_labels)
+
+cortisol_cerv_lmm
+```
+
+## Androstenedione (LMM)
+```{r}
+model_and_cl_lmm <- lmer(androstenedione_ng_g ~ cl_visit + (1|SubjectID), data = data_clean, REML = TRUE)
+
+and_fix   <- fixef(model_and_cl_lmm)
+R2        <- round(MuMIn::r.squaredGLMM(model_and_cl_lmm)[1], 3)
+pval      <- signif(coef(summary(model_and_cl_lmm))["cl_visit", "Pr(>|t|)"], 3)
+slope     <- round(and_fix["cl_visit"], 3)
+intercept <- round(and_fix["(Intercept)"], 3)
+eq         <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
+label_text <- paste0("  r² = ", R2, "\n  ", eq, "\n  p = ", pval)
+
+fake_cl <- data.frame(cl_visit = seq(min(data_clean$cl_visit), max(data_clean$cl_visit), length.out = 100))
+prediction <- predict(model_and_cl_lmm, newdata = fake_cl, re.form = NA)
+predicted_frame <- cbind(fake_cl, prediction)
+
+andr_cerv_lmm <- ggplot(data_clean, aes(x = cl_visit, y = androstenedione_ng_g)) +
+  geom_point(aes(colour = risk_group), size = 2.2, alpha = 0.85) +
+  geom_line(data = predicted_frame, aes(x = cl_visit, y = prediction),
+            colour = "black", linewidth = 0.5) +
+  annotate("text", x = -Inf, y = Inf, label = label_text, hjust = 0, vjust = 1.2,
+           size = 3.2, lineheight = 0.95) +
+  labs(colour = "Outcome") +
+  xlab("Cervical Length (mm)") +
+  ylab("Androstenedione (ng/g)") +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.20))) +
+  scale_colour_manual(values = risk_cols, labels = risk_labels)
+
+andr_cerv_lmm
+```
+
+
 ## Difference in steroids levels in term vs preterm
 Analyses performed considering only one sample per patient (select timepoint B for longitudinal ones to balance gestational age of preterm group).
 ```{r}
@@ -894,7 +1106,7 @@ ggsave(here("images_reviewed", "combined_scatter_boxplots_panelAB.png"),
 
 # Figure 3
 ```{r, echo=TRUE, message=FALSE, warning=FALSE}
-row_a_f3 <- (prog_cerv + cortisol_cerv + andr_cerv) +
+row_a_f3 <- (prog_cerv_lmm + cortisol_cerv_lmm + andr_cerv_lmm) +
   plot_layout(guides = "collect", axis_titles = "collect_x") &
   theme(legend.position = "right")
 
@@ -1430,135 +1642,3 @@ ggsave(here("images", "prog_cort_and_levels_controls_ng_ml.png"), side_by_side,
 ```
 
 
-
-
-
-
-### Addition of LMEM to investigate relationship of main steroids and gestational age for all samples
-```{r}
-library(lme4)
-
-data$SubjectID <- factor(data$cons_v2)
-
-model_prog_lmm <- lmer(progesterone_ng_g ~ gestational_age_final + (1|SubjectID), data=data, REML=TRUE)
-
-model_cort_lmm <- lmer(cortisol_ng_g ~ gestational_age_final + (1|SubjectID), data=data,REML=TRUE)
-
-model_and_lmm <- lmer(androstenedione_ng_g ~ gestational_age_final + (1|SubjectID), data=data, REML=TRUE)
-
-summary(model_prog_lmm)
-summary(model_cort_lmm)
-summary(model_and_lmm)
-
-```
-
-### New scatterplots for figure 3A (previously figure 2A) using lmer results
-
-```{r}
-library(MuMIn)
-```
-# 1, progesterone
-```{r}
-library(MuMIn)
-# statistics
-prog_fix <- fixef(model_prog_lmm)
-R2 <- round(MuMIn::r.squaredGLMM(model_prog_lmm)[1],3)
-pval <- signif(coef(summary(model_prog_lmm))["gestational_age_final","Pr(>|t|)"  ], 3)
-
-slope <- round(prog_fix["gestational_age_final"], 3)
-intercept <- round(prog_fix["(Intercept)"], 3)
-
-eq <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
-label_text <- paste0("  r² = ", R2, "\n  ", eq, "\n  p = ", pval)
-
-# prediction grid
-fake_gest_age <- data.frame(gestational_age_final = seq(12.5, 25.5, by = 0.005))
-
-prediction <- predict(model_prog_lmm, newdata = fake_gest_age, re.form = NA)
-
-predicted_frame <- cbind(fake_gest_age, prediction)
-
-prog_scatterplot_lmm <- ggplot(data, aes(x = gestational_age_final, y = progesterone_ng_g)) +
-  geom_point(aes(colour = risk_group), size = 2.2,alpha = 0.85) +
-  geom_line(data = predicted_frame, aes( x = gestational_age_final, y = prediction), colour = "black", linewidth = 0.5) +
-  annotate("text",x = -Inf,  y = Inf, label = label_text, hjust = 0, vjust = 1.2, size = 3.2, lineheight = 0.95) +
-  labs(colour = "Outcome") + xlab("Gestational Age (weeks)") +
-  ylab("Progesterone (ng/g)") +
-  scale_y_continuous(expand = expansion(mult = c(0.05, 0.20)))+
-  scale_colour_manual(values = risk_cols, labels = risk_labels)
-  
-prog_scatterplot_lmm
-```
-#2, cortisol
-```{r}
-# statistics
-cort_fix <- fixef(model_cort_lmm)
-R2 <- round(MuMIn::r.squaredGLMM(model_cort_lmm)[1],3)
-pval <- signif(coef(summary(model_cort_lmm))["gestational_age_final","Pr(>|t|)"],3)
-
-slope <- round(cort_fix["gestational_age_final"], 3)
-intercept <- round(cort_fix["(Intercept)"], 3)
-
-eq <- paste0("y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
-label_text <- paste0("  r² = ", R2,"\n  ", eq, "\n  p = ", pval)
-
-# prediction grid
-fake_gest_age <- data.frame(gestational_age_final = seq(12.5, 25.5, by = 0.005))
-
-prediction <- predict(model_cort_lmm, newdata = fake_gest_age, re.form = NA)
-
-predicted_frame <- cbind(fake_gest_age, prediction)
-
-cort_scatterplot_lmm <- ggplot(data,aes(x = gestational_age_final,y = cortisol_ng_g)) +
-  geom_point(aes(colour = risk_group),size = 2.2, alpha = 0.85) +
-  geom_line(data = predicted_frame, aes(x = gestational_age_final, y = prediction),
-    colour = "black", linewidth = 0.5) +
-  annotate("text", x = -Inf, y = Inf, label = label_text, hjust = 0, vjust = 1.2,
-    size = 3.2, lineheight = 0.95 ) + labs(colour = "Outcome") +
-  xlab("Gestational Age (weeks)") +
-  ylab("Cortisol (ng/g)") + scale_y_continuous(expand = expansion(mult = c(0.05, 0.20)))+ 
-  scale_colour_manual(values = risk_cols,labels = risk_labels)
-
-
-cort_scatterplot_lmm
-```
-#3, androstenedione
-```{r}
-# statistics
-and_fix <- fixef(model_and_lmm)
-R2 <- round(MuMIn::r.squaredGLMM(model_and_lmm)[1], 3)
-pval <- signif(coef(summary(model_and_lmm))["gestational_age_final", "Pr(>|t|)"], 3)
-
-slope <- round(and_fix["gestational_age_final"], 3)
-intercept <- round(and_fix["(Intercept)"], 3)
-
-eq <- paste0( "y = ", slope, "x ", ifelse(intercept >= 0, "+ ", "- "), abs(intercept))
-label_text <- paste0( "  r² = ", R2,"\n  ", eq, "\n  p = ", pval)
-
-# prediction grid
-fake_gest_age <- data.frame(gestational_age_final = seq(12.5, 25.5, by = 0.005))
-prediction <- predict(model_and_lmm, newdata = fake_gest_age, re.form = NA)
-predicted_frame <- cbind( fake_gest_age, prediction)
-
-androst_scatterplot_lmm <- ggplot(data,
-  aes(x = gestational_age_final, y = androstenedione_ng_g)) +
-  geom_point(aes(colour = risk_group),size = 2.2, alpha = 0.85) +
-  geom_line(data = predicted_frame, aes(x = gestational_age_final, y = prediction), colour = "black", linewidth = 0.5) +
-annotate("text",x = -Inf, y = Inf,label = label_text, hjust = 0, vjust = 1.2, size = 3.2, lineheight = 0.95) +
-  labs(colour = "Outcome") +  xlab("Gestational Age (weeks)") +
-  ylab("Androstenedione (ng/g)") +  scale_y_continuous(expand = expansion(mult = c(0.05, 0.20)))+
-  scale_colour_manual(values = risk_cols, labels = risk_labels)
-
-androst_scatterplot_lmm
-```
-
-# substituting this at line 625 should be enough to modify the final figure
-```{r}
-row_a_lmm <- prog_scatterplot_lmm +
-             cort_scatterplot_lmm +
-             androst_scatterplot_lmm
-
-row_a_grp <- row_a_lmm +
-  plot_layout(guides = "collect", axis_titles = "collect_x") &
-  theme(legend.position = "right")
-```
