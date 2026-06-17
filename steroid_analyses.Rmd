@@ -730,7 +730,7 @@ annotate("text",x = -Inf, y = Inf,label = label_text, hjust = 0, vjust = 1.2, si
 androst_scatterplot_lmm
 ```
 
-# Figure 2
+# Figure 3
 ```{r}
 row_a <- prog_scatterplot_lmm + cort_scatterplot_lmm + androst_scatterplot_lmm
 row_b <- individuals_prog   + individuals_cort   + individuals_andr
@@ -754,13 +754,13 @@ fig2 <- (row_a_grp / row_bc_grp) +
   plot_annotation(tag_levels = list(c("A", "", "", "B", "", "", "C", "", ""))) &
   theme(plot.tag = element_text(size = 16, face = "bold"))
 
-ggsave(here("images_reviewed", "Figure2.png"), fig2,
+ggsave(here("images_reviewed", "Figure3.png"), fig3,
        width = 300, height = 200, units = "mm", dpi = 300)
 
-ggsave(here("images_reviewed", "Figure2.svg"), fig2, 
+ggsave(here("images_reviewed", "Figure3.svg"), fig3, 
        width = 300, height = 200, units = "mm", dpi=300)
 
-fig2
+fig3
 ```
 
 # Regression model of cervical lenght and steroids levels
@@ -1104,28 +1104,28 @@ ggsave(here("images_reviewed", "combined_scatter_boxplots_panelAB.png"),
        combined_figure, width = 18, height = 12, dpi = 300)
 ```
 
-# Figure 3
+# Figure 2
 ```{r, echo=TRUE, message=FALSE, warning=FALSE}
-row_a_f3 <- (prog_cerv_lmm + cortisol_cerv_lmm + andr_cerv_lmm) +
+row_a_f2 <- (prog_cerv_lmm + cortisol_cerv_lmm + andr_cerv_lmm) +
   plot_layout(guides = "collect", axis_titles = "collect_x") &
   theme(legend.position = "right")
 
-row_b_f3 <- (boxplot_outcome_prog + boxplot_outcome_cort + boxplot_outcome_andr) +
+row_b_f2 <- (boxplot_outcome_prog + boxplot_outcome_cort + boxplot_outcome_andr) +
   plot_layout(guides = "collect", axis_titles = "collect_x") &
   guides(fill = "none") &
   theme(legend.position = "none")
 
-fig3 <- (row_a_f3 / row_b_f3) +
+fig2 <- (row_a_f2 / row_b_f2) +
   plot_layout(heights = c(1, 1)) +
   plot_annotation(tag_levels = list(c("A", "", "", "B", "", ""))) &
   theme(plot.tag = element_text(size = 16, face = "bold"))
 
-ggsave(here("images_reviewed", "Figure3.png"), fig3,
+ggsave(here("images_reviewed", "Figure2.png"), fig2,
        width = 300, height = 200, units = "mm", dpi = 300)
-ggsave(here("images_reviewed", "Figure3.svg"), fig3,
+ggsave(here("images_reviewed", "Figure2.svg"), fig2,
        width = 300, height = 200, units = "mm", dpi = 300)
 
-fig3
+fig2
 ```
 
 
